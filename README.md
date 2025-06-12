@@ -1,4 +1,4 @@
-# 🎧 Vocal Emotions Classifier
+# 🎧 NeuroTone: The Vocal Emotions Classifier
 
 ## Overview
 
