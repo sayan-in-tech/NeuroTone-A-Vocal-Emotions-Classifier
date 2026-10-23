@@ -1,169 +1,175 @@
-# 🎧 NeuroTone: The Vocal Emotions Classifier
+# NeuroTone: Multimodal Emotion Recognition
 
-## Overview
+NeuroTone is a Streamlit application that analyzes an uploaded video and estimates emotion from three modalities:
 
-The **Vocal Emotions Classifier** is a machine learning-powered application that detects emotions from speech audio files. By leveraging advanced audio processing techniques and deep learning, this project identifies emotions such as happiness, sadness, anger, and more from uploaded audio files. The application is built using **Streamlit** for the user interface, **TensorFlow** for the deep learning model, and **Librosa** for audio feature extraction.
+* Facial expressions
+* Vocal characteristics
+* The spoken transcript
 
-## Features
+The application combines the predictions into one weighted result and presents probability charts, timelines, transcription, and video statistics.
 
-* 🎤  **Audio File Support** : Upload audio files in various formats (e.g., `.wav`, `.mp3`, `.flac`, `.ogg`, `.m4a`, `.aac`).
-* 🔄  **Automatic Conversion** : Non-WAV files are automatically converted to WAV format using [pydub](vscode-file://vscode-app/c:/Users/sayan/AppData/Local/Programs/Microsoft%20VS%20Code/resources/app/out/vs/code/electron-sandbox/workbench/workbench.html).
-* 🎯  **Emotion Detection** : Predicts emotions such as `happy`, `sad`, `angry`, `neutral`, and more.
-* 📈  **Confidence Score** : Displays the confidence level of the predicted emotion.
-* 🛠  **Real-Time Feedback** : Progress bars and status updates during audio processing.
-* 🎉  **Interactive UI** : Built with Streamlit for a seamless and user-friendly experience.
+## Current Application
 
-## How It Works
+The production entry point is `app.py`.
 
-1. **Audio Upload** : Users upload an audio file via the Streamlit interface.
-2. **Preprocessing** :
+### Analysis Flow
 
-* If the file is not in WAV format, it is converted using [pydub](vscode-file://vscode-app/c:/Users/sayan/AppData/Local/Programs/Microsoft%20VS%20Code/resources/app/out/vs/code/electron-sandbox/workbench/workbench.html).
-* Audio features (MFCCs) are extracted using [librosa](vscode-file://vscode-app/c:/Users/sayan/AppData/Local/Programs/Microsoft%20VS%20Code/resources/app/out/vs/code/electron-sandbox/workbench/workbench.html).
-* Delta and delta² features are computed to enhance the feature set.
+1. Upload an `mp4`, `avi`, `mov`, `mkv`, or `webm` video.
+2. Save the upload to a temporary file.
+3. Extract the video's audio as a temporary WAV file with `pydub`.
+4. Sample video frames once per second.
+5. Detect faces with OpenCV's Haar cascade and classify the first detected face with MobileNetV2.
+6. Extract 40 MFCC features from the audio and classify vocal emotion with the Keras model.
+7. Transcribe the audio with Whisper.
+8. Classify the transcript with the serialized scikit-learn text pipeline.
+9. Map modality labels to a shared vocabulary and combine active predictions.
+10. Display the result and detailed modality breakdowns in Streamlit.
 
-1. **Prediction** :
+### Fusion Weights
 
-* The pre-trained TensorFlow model processes the features.
-* The model outputs the predicted emotion and its confidence score.
+| Modality | Weight |
+| --- | ---: |
+| Face | 35% |
+| Voice | 55% |
+| Text | 20% |
 
-1. **Results Display** :
+Only modalities that produce a prediction participate in the final normalized score.
 
-* The detected emotion and confidence score are displayed.
-* Users can listen to the uploaded audio directly in the app.
+### Supported Emotion Labels
+
+The shared output vocabulary is `angry`, `disgust`, `fear`, `happy`, `sad`, `surprise`, and `neutral`.
+
+The text model originally uses `anger`, `joy`, and `sadness`; the application maps those labels to `angry`, `happy`, and `sad`. `shame` is mapped to `neutral`.
+
+## Repository Structure
+
+```text
+.
+├── app.py                         Main multimodal Streamlit application
+├── audio_formatter.py             Standalone audio-to-WAV helper
+├── video_processor.py              Video sampling and face inference
+├── requirements.txt                Root dependency list
+├── models/
+│   ├── audio/
+│   │   ├── emotion_recognition_model.keras
+│   │   ├── best_model.keras        Alternative audio model, not used by app.py
+│   │   ├── scaler_params.npy
+│   │   └── label_encoder.pkl
+│   ├── cv/
+│   │   ├── face_model.pth
+│   │   └── face_model.py
+│   └── text/
+│       └── emotion_classifier_pipe_lr.pkl
+├── cv_addition/                   Face-model experiments and training code
+├── Emotion-Detection-in-Text/     Standalone text emotion application
+├── Jupyter Notebook/               Audio-classifier notebook
+├── labels/                         Audio features and labels
+└── whisper-audio-to-text/          Standalone Whisper script
+```
+
+## Requirements
+
+The main application uses Streamlit, TensorFlow/Keras, PyTorch, torchvision, OpenCV, librosa, soundfile, pydub, OpenAI Whisper, scikit-learn, joblib, NumPy, pandas, Pillow, and Plotly.
+
+Python 3.8 or newer is recommended. A virtual environment is strongly recommended.
+
+Audio and video decoding through `pydub` generally requires **FFmpeg** to be installed and available on `PATH`.
+
+The checked-in root `requirements.txt` currently appears to have a malformed or non-standard text encoding. Review or rewrite it as normal UTF-8 before installing it with `pip`.
 
 ## Installation
 
-### Prerequisites
+On Windows:
 
-* Python 3.8 or higher
-* Virtual environment (recommended)
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
 
-### Steps
+On macOS or Linux:
 
-1. Clone the repository:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
 
-   **git** **clone** **https://github.com/sayan-in-tech/vocal-emotions-cl**assifier.git
+Whisper downloads its selected model the first time the application starts. The default model is `small.en`. Set `WHISPER_MODEL_NAME` to choose another model.
 
-   **cd** **vocal-emotions-classifier**
-2. Create and activate a virtual environment:
+## Run the Main Application
 
-   **python** **-m** **venv** **venv**
+```bash
+streamlit run app.py
+```
 
-   **venv\Scripts\activate**  **# On Windows**
+Open the URL printed by Streamlit, normally `http://localhost:8501`, and upload a video containing a visible face and speech for the fullest analysis.
 
-   **source** **venv/bin/activate**  **# On macOS/Linux**
-3. Install dependencies:
+The application can return partial results when a modality is unavailable. For example, a video without a detectable face can still be analyzed for voice and transcript emotion.
 
-   **pip** **install** **-r** **requirements.txt**
-4. Run the application:
+## Model Artifacts
 
-   **streamlit** **run** **app.py**
-5. Open the application in your browser at `http://localhost:8501`.
+The main app expects these files:
 
-## File Structure
+| File | Purpose |
+| --- | --- |
+| `models/audio/emotion_recognition_model.keras` | Audio emotion classifier |
+| `models/audio/scaler_params.npy` | Mean and scale values for audio features |
+| `models/audio/label_encoder.pkl` | Maps audio class indexes to labels |
+| `models/cv/face_model.pth` | MobileNetV2 face-emotion weights |
+| `models/text/emotion_classifier_pipe_lr.pkl` | CountVectorizer plus LogisticRegression pipeline |
 
-**vocal-emotions-classifier/**
+The application loads the audio and text artifacts with Streamlit resource caching and loads the face model on CPU or CUDA depending on availability.
 
-**├── app.py                     # Main Streamlit **application
+## Training and Experiments
 
-**├── audio_formatter.py         # Audio conversion **utility
+### Audio
 
-**├── models/**
+`Jupyter Notebook/Vocal_Emotional_Classifier.ipynb` contains the audio-model workflow. The runtime feature path uses 22,050 Hz audio, 40 MFCC coefficients, delta and delta-delta features, padding/truncation, and saved normalization parameters.
 
-**│   ├── emotion_recognition_model.keras  # **Pre-trained TensorFlow model
+### Face
 
-**│   ├── scaler_params.npy                # Scaler **parameters for feature normalization
+`cv_addition/train_face_model.ipynb` is the more complete face-training workflow. It documents a MobileNetV2 transfer-learning model with seven classes, image augmentation, an 80/20 train-validation split, validation metrics, a confusion matrix, and model export.
 
-**│   └── label_encoder.pkl                # Label **encoder for emotion mapping
+`cv_addition/train_face.py` is a simpler older training script. It expects images under `data/images/<emotion>/` and writes a checkpoint under `checkpoints/`.
 
-**├── requirements.txt           # Python **dependencies
+### Text
 
-**├── .gitignore                 # Git ignore file**
+`Emotion-Detection-in-Text/notebooks/Emotion Detection in Text.ipynb` trains the text model from an eight-class emotion dataset using text cleaning, `CountVectorizer`, and LogisticRegression. The resulting pipeline is saved as `emotion_classifier_pipe_lr.pkl`.
 
-**└── README.md                  # Project **documentation
+## Standalone Text Application
 
-## Key Components
+The text project can also be run independently:
 
-### 1. **`app.py`**
+```bash
+cd Emotion-Detection-in-Text
+streamlit run app.py
+```
 
-The main application file that:
+It provides text prediction, probability charts, an About page, and a Monitor page backed by SQLite. Runtime tracking data is created under `Emotion-Detection-in-Text/data/data.db`.
 
-* Handles file uploads.
-* Preprocesses audio files.
-* Extracts features and predicts emotions using the pre-trained model.
-* Displays results in an interactive UI.
+## Important Implementation Notes
 
-### 2. **[audio_formatter.py](vscode-file://vscode-app/c:/Users/sayan/AppData/Local/Programs/Microsoft%20VS%20Code/resources/app/out/vs/code/electron-sandbox/workbench/workbench.html)**
+* The main application accepts videos, not direct audio uploads.
+* Face analysis samples frames and analyzes only the first face found in each sampled frame.
+* The application uses OpenCV Haar-cascade detection before MobileNetV2 classification.
+* Whisper transcription is restricted to English in the main app.
+* The audio timeline analyzes separate three-second segments.
+* Temporary video and WAV files are removed after processing when cleanup is reached.
+* Model predictions are estimates and should not be treated as clinical or psychological diagnoses.
 
-A utility script for converting audio files to WAV format using [pydub](vscode-file://vscode-app/c:/Users/sayan/AppData/Local/Programs/Microsoft%20VS%20Code/resources/app/out/vs/code/electron-sandbox/workbench/workbench.html).
+## Known Limitations
 
-### 3. **Models**
-
-* **`emotion_recognition_model.keras`** : A TensorFlow model trained on multiple datasets (e.g., RAVDESS, CREMA-D, TESS, SAVEE).
-* **[scaler_params.npy](vscode-file://vscode-app/c:/Users/sayan/AppData/Local/Programs/Microsoft%20VS%20Code/resources/app/out/vs/code/electron-sandbox/workbench/workbench.html)** : Contains mean and scale values for feature normalization.
-* **`label_encoder.pkl`** : Maps numerical predictions to emotion labels.
-
-## Datasets
-
-The model was trained on the following datasets:
-
-* **RAVDESS** : Ryerson Audio-Visual Database of Emotional Speech and Song.
-* **CREMA-D** : Crowd-sourced Emotional Multimodal Actors Dataset.
-* **TESS** : Toronto Emotional Speech Set.
-* **SAVEE** : Surrey Audio-Visual Expressed Emotion.
-
-## Technologies Used
-
-* **Frontend** : Streamlit
-* **Backend** : TensorFlow, Librosa, Pydub
-* **Programming Language** : Python
-* **Audio Processing** : MFCCs, Delta, Delta² features
-* **Machine Learning** : Deep learning with LSTM and CNN layers
-
-## Usage
-
-1. Launch the application.
-2. Upload an audio file.
-3. Wait for the processing to complete.
-4. View the detected emotion and confidence score.
-
-## Example
-
-### Input
-
-* Audio file: `example.wav`
-
-### Output
-
-* Detected Emotion: **Happy**
-* Confidence: **92.5%**
-
-## Contributing
-
-Contributions are welcome! To contribute:
-
-1. Fork the repository.
-2. Create a new branch:
-
-   **git** **checkout** **-b** **feature-name**
-3. Commit your changes:
-
-   **git** **commit** **-m** **"Add feature-name"**
-4. Push to the branch:
-
-   **git** **push** **origin** **feature-name**
-5. Open a pull request.
+* Video files without an audio track cannot produce voice or transcript predictions.
+* Face detection depends on lighting, pose, resolution, and the Haar cascade's limitations.
+* The default Whisper model can require substantial RAM, disk space, and startup time.
+* CPU inference can be slow for long videos.
+* Some model paths are relative to the working directory, so launch the app from the repository root.
+* The checked-in training data is not included; training notebooks require their documented datasets and folder structures.
+* There is no automated test suite currently included in the repository.
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
-
-## Acknowledgments
-
-* **Datasets** : RAVDESS, CREMA-D, TESS, SAVEE
-* **Libraries** : TensorFlow, Librosa, Streamlit, Pydub
-
----
-
-Feel free to reach out for any questions or feedback! 🎉
+This project is licensed under the MIT License. See [LICENSE](LICENSE).

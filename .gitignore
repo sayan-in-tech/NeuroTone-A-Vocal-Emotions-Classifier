@@ -2,3 +2,8 @@ venv/
 __pycache__
 datasets/
 datasets.zip
+.venv
+# .gitignore file
+__pycache__/
+.ipynb_checkpoints/
+data/
